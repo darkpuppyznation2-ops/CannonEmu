@@ -17,6 +17,131 @@ namespace CannonEmuFrontend
         private CancellationTokenSource? _cancellationTokenSource;
         private string _romsPath;
 
+        // Comprehensive list of console ROM extensions
+        private static readonly string[] ValidROMExtensions = new[]
+        {
+            // Nintendo
+            ".nes", ".sfc", ".n64", ".z64", ".gb", ".gbc", ".gba", ".nds",
+            ".3ds", ".cci", ".cxi", ".nro", ".nso", ".xci", ".nsp",
+
+            // Sega
+            ".md", ".gen", ".sms", ".gg", ".seg", ".bin", ".rom",
+
+            // Sony
+            ".ps", ".cue", ".bin", ".img", ".psx", ".ps2", ".iso",
+
+            // Atari
+            ".a26", ".bin", ".rom", ".st", ".stx", ".msa", ".dim",
+
+            // Commodore
+            ".d64", ".d81", ".t64", ".prg",
+
+            // Arcade & MAME
+            ".zip", ".7z", ".rar",
+
+            // Handhelds
+            ".gb", ".gbc", ".gba", ".vb",
+
+            // Multi-system
+            ".bin", ".rom", ".iso", ".img", ".cue", ".cso", ".pbp",
+
+            // Dreamcast
+            ".cdi", ".gdi",
+
+            // Neo Geo
+            ".zip", ".rar",
+
+            // Turbografx-16 / PC Engine
+            ".pce", ".sgx", ".ccd", ".cue",
+
+            // Genesis/Megadrive variants
+            ".asm", ".asx",
+
+            // Master System variants
+            ".sms", ".sg",
+
+            // Game Gear variants
+            ".gg",
+
+            // Intellivision
+            ".int", ".bin",
+
+            // Colecovision
+            ".col", ".bin", ".rom",
+
+            // VIC-20
+            ".prg", ".tap", ".bin",
+
+            // Amiga
+            ".adf", ".adz", ".fdi",
+
+            // Apple II
+            ".dsk", ".do", ".po",
+
+            // Magnavox Odyssey 2
+            ".bin", ".rom",
+
+            // Fairchild Channel F
+            ".bin", ".rom",
+
+            // RCA Studio II
+            ".bin", ".rom",
+
+            // Vectrex
+            ".bin", ".vec", ".rom",
+
+            // Virtual Boy
+            ".vb", ".bin",
+
+            // PC-FX
+            ".cue", ".cso", ".pbp", ".iso",
+
+            // WonderSwan
+            ".ws", ".wsc", ".bin",
+
+            // Tiger Game.com
+            ".bin", ".rom",
+
+            // Milton Bradley Microvision
+            ".bin", ".rom",
+
+            // Epoch Game Pocket Computer
+            ".bin", ".rom",
+
+            // Sharp X1
+            ".bin", ".rom", ".dx1", ".2d", ".2hd",
+
+            // FM Towns
+            ".iso", ".cue", ".cso",
+
+            // Acorn Archimedes
+            ".adf", ".adl",
+
+            // BBC Micro
+            ".ssd", ".dsd", ".adl",
+
+            // MSX
+            ".rom", ".mx1", ".mx2", ".bin",
+
+            // Sinclair ZX Spectrum
+            ".tap", ".tzx", ".z80", ".sna", ".scl", ".trd",
+
+            // Commodore Plus/4
+            ".bin", ".rom", ".prg",
+
+            // Atari 8-bit
+            ".xex", ".atr", ".cas", ".bin",
+
+            // Bandai WonderSwan Color
+            ".wsc", ".bin",
+
+            // Mattel Auto Race
+            ".bin", ".rom",
+
+            // Generic console formats
+            ".bin", ".rom", ".img", ".iso", ".cue", ".cso"
+        };
+
         public MainWindow()
         {
             InitializeComponent();
@@ -318,6 +443,7 @@ namespace CannonEmuFrontend
                 var romFiles = Directory.GetFiles(_romsPath, "*.*", SearchOption.TopDirectoryOnly)
                     .Where(f => IsValidROMExtension(f))
                     .Select(f => Path.GetFileName(f))
+                    .OrderBy(f => f)
                     .ToArray();
 
                 if (romFiles.Length == 0)
@@ -341,9 +467,8 @@ namespace CannonEmuFrontend
 
         private bool IsValidROMExtension(string filePath)
         {
-            string[] validExtensions = { ".bin", ".rom", ".gb", ".gba", ".nes", ".sfc", ".z64" };
             string extension = Path.GetExtension(filePath).ToLower();
-            return validExtensions.Contains(extension);
+            return ValidROMExtensions.Contains(extension);
         }
 
         private void LoadSelectedROM()
