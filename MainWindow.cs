@@ -17,6 +17,13 @@ namespace CannonEmuFrontend
         private CancellationTokenSource? _cancellationTokenSource;
         private string _romsPath;
 
+        // iiSU Color Scheme
+        private static readonly Color PrimaryColor = Color.FromArgb(31, 31, 31);      // Dark background
+        private static readonly Color SecondaryColor = Color.FromArgb(50, 50, 50);     // Lighter panels
+        private static readonly Color AccentColor = Color.FromArgb(0, 173, 239);       // Bright blue
+        private static readonly Color TextColor = Color.FromArgb(240, 240, 240);       // Light text
+        private static readonly Color DimTextColor = Color.FromArgb(150, 150, 150);    // Dim text
+
         // Comprehensive list of console ROM extensions
         private static readonly string[] ValidROMExtensions = new[]
         {
@@ -179,250 +186,347 @@ namespace CannonEmuFrontend
         private void SetupUI()
         {
             // Main form settings
-            this.Text = "Cannon Emulator Frontend";
-            this.Size = new Size(800, 600);
+            this.Text = "Cannon Emulator";
+            this.Size = new Size(1000, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.BackColor = Color.FromArgb(30, 30, 30);
-            this.ForeColor = Color.White;
+            this.BackColor = PrimaryColor;
+            this.ForeColor = TextColor;
+            this.Font = new Font("Segoe UI", 9.75f);
+
+            // Remove default borders
+            this.FormBorderStyle = FormBorderStyle.Fixed3D;
+            this.MaximizeBox = false;
+            this.ControlBox = true;
 
             // Menu strip
-            var menuStrip = new MenuStrip();
+            var menuStrip = new MenuStrip
+            {
+                BackColor = SecondaryColor,
+                ForeColor = TextColor,
+                AutoSize = false,
+                Height = 25
+            };
             var fileMenu = menuStrip.Items.Add("&File");
+            ((ToolStripMenuItem)fileMenu).ForeColor = TextColor;
             ((ToolStripMenuItem)fileMenu).DropDownItems.Add("Open ROMs Folder", null, (s, e) => OpenRomsFolder());
             ((ToolStripMenuItem)fileMenu).DropDownItems.Add("E&xit", null, (s, e) => this.Close());
             this.Controls.Add(menuStrip);
 
-            // Main panel
-            var mainPanel = new TableLayoutPanel
+            // Main container panel
+            var mainContainer = new Panel
             {
                 Dock = DockStyle.Fill,
-                RowCount = 4,
-                ColumnCount = 2,
-                Padding = new Padding(10),
-                BackColor = Color.FromArgb(30, 30, 30)
+                BackColor = PrimaryColor,
+                Padding = new Padding(0)
             };
-            mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            mainPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            mainPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
 
-            // Connection panel
-            var connPanel = new GroupBox
+            // Top section - Connection and Status (Side by side)
+            var topPanel = new Panel
             {
-                Text = "Connection Settings",
-                Padding = new Padding(10),
-                ForeColor = Color.White,
-                BackColor = Color.FromArgb(45, 45, 45)
+                Dock = DockStyle.Top,
+                Height = 120,
+                BackColor = PrimaryColor,
+                Padding = new Padding(10)
             };
-            connPanel.Controls.AddRange(CreateConnectionControls());
-            mainPanel.Controls.Add(connPanel, 0, 0);
-            mainPanel.SetColumnSpan(connPanel, 2);
 
-            // ROM panel
-            var romPanel = new GroupBox
+            // Left side - Connection
+            var connectionPanel = CreateConnectionPanel();
+            connectionPanel.Location = new Point(10, 10);
+            connectionPanel.Size = new Size(480, 100);
+            topPanel.Controls.Add(connectionPanel);
+
+            // Right side - Status/Info
+            var statusPanel = CreateStatusPanel();
+            statusPanel.Location = new Point(500, 10);
+            statusPanel.Size = new Size(480, 100);
+            topPanel.Controls.Add(statusPanel);
+
+            mainContainer.Controls.Add(topPanel);
+
+            // Middle section - ROM List (Full width)
+            var romPanel = CreateROMPanel();
+            romPanel.Dock = DockStyle.Top;
+            romPanel.Height = 200;
+            mainContainer.Controls.Add(romPanel);
+
+            // Lower middle section - Display/Console Output
+            var displayPanel = CreateDisplayPanel();
+            displayPanel.Dock = DockStyle.Fill;
+            mainContainer.Controls.Add(displayPanel);
+
+            // Bottom section - Control Buttons
+            var controlPanel = CreateControlPanel();
+            controlPanel.Dock = DockStyle.Bottom;
+            controlPanel.Height = 70;
+            mainContainer.Controls.Add(controlPanel);
+
+            this.Controls.Add(mainContainer);
+        }
+
+        private Panel CreateConnectionPanel()
+        {
+            var panel = new Panel
             {
-                Text = "ROMs",
-                Padding = new Padding(10),
-                ForeColor = Color.White,
-                BackColor = Color.FromArgb(45, 45, 45)
+                BackColor = SecondaryColor,
+                BorderStyle = BorderStyle.FixedSingle
             };
-            romPanel.Controls.AddRange(CreateROMControls());
-            mainPanel.Controls.Add(romPanel, 0, 1);
-            mainPanel.SetColumnSpan(romPanel, 2);
 
-            // Display panel
-            var displayPanel = new GroupBox
+            var titleLabel = new Label
             {
-                Text = "Display",
-                Padding = new Padding(10),
+                Text = "CONNECTION",
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                ForeColor = AccentColor,
+                AutoSize = true,
+                Location = new Point(10, 5)
+            };
+            panel.Controls.Add(titleLabel);
+
+            // COM Port
+            var portLabel = new Label
+            {
+                Text = "Port:",
+                ForeColor = TextColor,
+                AutoSize = true,
+                Location = new Point(10, 25)
+            };
+            panel.Controls.Add(portLabel);
+
+            var portCombo = new ComboBox
+            {
+                Name = "PortCombo",
+                Width = 120,
+                Location = new Point(50, 22),
+                BackColor = PrimaryColor,
+                ForeColor = TextColor,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            panel.Controls.Add(portCombo);
+
+            // Baud Rate
+            var baudLabel = new Label
+            {
+                Text = "Baud:",
+                ForeColor = TextColor,
+                AutoSize = true,
+                Location = new Point(180, 25)
+            };
+            panel.Controls.Add(baudLabel);
+
+            var baudCombo = new ComboBox
+            {
+                Name = "BaudCombo",
+                Width = 100,
+                Location = new Point(225, 22),
+                BackColor = PrimaryColor,
+                ForeColor = TextColor,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            baudCombo.Items.AddRange(new object[] { 9600, 19200, 38400, 57600, 115200 });
+            baudCombo.SelectedIndex = 0;
+            panel.Controls.Add(baudCombo);
+
+            // Connect button
+            var connectBtn = CreateStyledButton("Connect", 10, 50, 100);
+            connectBtn.Name = "ConnectButton";
+            connectBtn.Click += ConnectButton_Click;
+            panel.Controls.Add(connectBtn);
+
+            // Refresh ports button
+            var refreshBtn = CreateStyledButton("Refresh", 120, 50, 80);
+            refreshBtn.Click += (s, e) => LoadComPorts();
+            panel.Controls.Add(refreshBtn);
+
+            return panel;
+        }
+
+        private Panel CreateStatusPanel()
+        {
+            var panel = new Panel
+            {
+                BackColor = SecondaryColor,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            var titleLabel = new Label
+            {
+                Text = "STATUS",
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                ForeColor = AccentColor,
+                AutoSize = true,
+                Location = new Point(10, 5)
+            };
+            panel.Controls.Add(titleLabel);
+
+            var statusLabel = new Label
+            {
+                Name = "StatusLabel",
+                Text = "Disconnected",
+                ForeColor = DimTextColor,
+                AutoSize = true,
+                Location = new Point(10, 30)
+            };
+            panel.Controls.Add(statusLabel);
+
+            var infoLabel = new Label
+            {
+                Name = "InfoLabel",
+                Text = "Ready",
+                ForeColor = DimTextColor,
+                AutoSize = true,
+                Location = new Point(10, 50)
+            };
+            panel.Controls.Add(infoLabel);
+
+            return panel;
+        }
+
+        private Panel CreateROMPanel()
+        {
+            var panel = new Panel
+            {
+                BackColor = PrimaryColor,
+                Padding = new Padding(10)
+            };
+
+            var titleLabel = new Label
+            {
+                Text = "ROMS",
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                ForeColor = AccentColor,
+                AutoSize = true,
+                Location = new Point(10, 5)
+            };
+            panel.Controls.Add(titleLabel);
+
+            // ROM List
+            var romListBox = new ListBox
+            {
+                Name = "ROMListBox",
                 Dock = DockStyle.Fill,
-                ForeColor = Color.White,
-                BackColor = Color.FromArgb(45, 45, 45)
+                Location = new Point(10, 25),
+                BackColor = SecondaryColor,
+                ForeColor = TextColor,
+                BorderStyle = BorderStyle.FixedSingle,
+                IntegralHeight = false,
+                Font = new Font("Segoe UI", 9.5f)
             };
+            panel.Controls.Add(romListBox);
+
+            // Button panel
+            var buttonPanel = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 40,
+                BackColor = PrimaryColor,
+                Padding = new Padding(10, 5, 10, 5)
+            };
+
+            var loadBtn = CreateStyledButton("Load ROM", 5, 5, 100);
+            loadBtn.Click += (s, e) => LoadSelectedROM();
+            buttonPanel.Controls.Add(loadBtn);
+
+            var refreshBtn = CreateStyledButton("Refresh", 110, 5, 80);
+            refreshBtn.Click += (s, e) => LoadROMs();
+            buttonPanel.Controls.Add(refreshBtn);
+
+            var openBtn = CreateStyledButton("Open Folder", 195, 5, 100);
+            openBtn.Click += (s, e) => OpenRomsFolder();
+            buttonPanel.Controls.Add(openBtn);
+
+            panel.Controls.Add(buttonPanel);
+
+            return panel;
+        }
+
+        private Panel CreateDisplayPanel()
+        {
+            var panel = new Panel
+            {
+                BackColor = PrimaryColor,
+                Padding = new Padding(10)
+            };
+
+            var titleLabel = new Label
+            {
+                Text = "CONSOLE OUTPUT",
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                ForeColor = AccentColor,
+                AutoSize = true,
+                Location = new Point(10, 5)
+            };
+            panel.Controls.Add(titleLabel);
+
             var displayTextBox = new TextBox
             {
                 Name = "DisplayTextBox",
                 Multiline = true,
                 ReadOnly = true,
                 Dock = DockStyle.Fill,
+                Location = new Point(10, 25),
                 BackColor = Color.FromArgb(20, 20, 20),
-                ForeColor = Color.Lime,
-                Font = new Font("Courier New", 10)
+                ForeColor = Color.FromArgb(0, 220, 100),
+                Font = new Font("Courier New", 9f),
+                BorderStyle = BorderStyle.FixedSingle,
+                ScrollBars = ScrollBars.Vertical
             };
-            displayPanel.Controls.Add(displayTextBox);
-            mainPanel.Controls.Add(displayPanel, 0, 2);
-            mainPanel.SetColumnSpan(displayPanel, 2);
+            panel.Controls.Add(displayTextBox);
 
-            // Control panel
-            var ctrlPanel = new GroupBox
-            {
-                Text = "Controls",
-                Padding = new Padding(10),
-                ForeColor = Color.White,
-                BackColor = Color.FromArgb(45, 45, 45)
-            };
-            ctrlPanel.Controls.AddRange(CreateControlButtons());
-            mainPanel.Controls.Add(ctrlPanel, 0, 3);
-            mainPanel.SetColumnSpan(ctrlPanel, 2);
-
-            this.Controls.Add(mainPanel);
+            return panel;
         }
 
-        private Control[] CreateConnectionControls()
+        private Panel CreateControlPanel()
         {
-            var controls = new List<Control>();
-            var tableLayout = new TableLayoutPanel
+            var panel = new Panel
             {
-                RowCount = 3,
-                ColumnCount = 3,
-                AutoSize = true,
-                Dock = DockStyle.Top,
-                BackColor = Color.FromArgb(45, 45, 45)
-            };
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-
-            // COM Port
-            var portLabel = new Label { Text = "COM Port:", AutoSize = true, ForeColor = Color.White };
-            var portCombo = new ComboBox { Name = "PortCombo", Width = 150 };
-            tableLayout.Controls.Add(portLabel, 0, 0);
-            tableLayout.Controls.Add(portCombo, 1, 0);
-
-            // Baud Rate
-            var baudLabel = new Label { Text = "Baud Rate:", AutoSize = true, ForeColor = Color.White };
-            var baudCombo = new ComboBox { Name = "BaudCombo", Width = 150 };
-            baudCombo.Items.AddRange(new object[] { 9600, 19200, 38400, 57600, 115200 });
-            baudCombo.SelectedIndex = 0;
-            tableLayout.Controls.Add(baudLabel, 0, 1);
-            tableLayout.Controls.Add(baudCombo, 1, 1);
-
-            // Connect button
-            var connectBtn = new Button
-            {
-                Name = "ConnectButton",
-                Text = "Connect",
-                Width = 100,
-                BackColor = Color.FromArgb(0, 120, 215),
-                ForeColor = Color.White
-            };
-            connectBtn.Click += ConnectButton_Click;
-            tableLayout.Controls.Add(connectBtn, 2, 0);
-
-            // Refresh ports button
-            var refreshBtn = new Button
-            {
-                Text = "Refresh",
-                Width = 100,
-                BackColor = Color.FromArgb(100, 100, 100),
-                ForeColor = Color.White
-            };
-            refreshBtn.Click += (s, e) => LoadComPorts();
-            tableLayout.Controls.Add(refreshBtn, 2, 1);
-
-            controls.Add(tableLayout);
-            return controls.ToArray();
-        }
-
-        private Control[] CreateROMControls()
-        {
-            var flowLayout = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                BackColor = Color.FromArgb(45, 45, 45),
-                FlowDirection = FlowDirection.TopDown
-            };
-
-            // ROMs List
-            var romListBox = new ListBox
-            {
-                Name = "ROMListBox",
-                Width = 750,
-                Height = 100,
-                BackColor = Color.FromArgb(20, 20, 20),
-                ForeColor = Color.White
-            };
-            flowLayout.Controls.Add(romListBox);
-
-            // Button panel
-            var buttonPanel = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                BackColor = Color.FromArgb(45, 45, 45)
-            };
-
-            var loadBtn = new Button
-            {
-                Text = "Load Selected ROM",
-                Width = 120,
-                BackColor = Color.FromArgb(0, 120, 215),
-                ForeColor = Color.White
-            };
-            loadBtn.Click += (s, e) => LoadSelectedROM();
-            buttonPanel.Controls.Add(loadBtn);
-
-            var refreshRomsBtn = new Button
-            {
-                Text = "Refresh ROMs",
-                Width = 100,
-                BackColor = Color.FromArgb(100, 100, 100),
-                ForeColor = Color.White
-            };
-            refreshRomsBtn.Click += (s, e) => LoadROMs();
-            buttonPanel.Controls.Add(refreshRomsBtn);
-
-            var openFolderBtn = new Button
-            {
-                Text = "Open Folder",
-                Width = 100,
-                BackColor = Color.FromArgb(100, 100, 100),
-                ForeColor = Color.White
-            };
-            openFolderBtn.Click += (s, e) => OpenRomsFolder();
-            buttonPanel.Controls.Add(openFolderBtn);
-
-            flowLayout.Controls.Add(buttonPanel);
-
-            return new[] { flowLayout };
-        }
-
-        private Control[] CreateControlButtons()
-        {
-            var flowLayout = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                BackColor = Color.FromArgb(45, 45, 45)
+                BackColor = SecondaryColor,
+                Dock = DockStyle.Bottom,
+                Padding = new Padding(10)
             };
 
             var buttons = new[]
             {
-                ("Reset", new EventHandler((s, e) => SendCommand("RESET"))),
-                ("Start", new EventHandler((s, e) => SendCommand("START"))),
-                ("Stop", new EventHandler((s, e) => SendCommand("STOP"))),
-                ("Fire", new EventHandler((s, e) => SendCommand("FIRE"))),
+                ("Reset", 10, (Action)(() => SendCommand("RESET"))),
+                ("Start", 130, (Action)(() => SendCommand("START"))),
+                ("Stop", 250, (Action)(() => SendCommand("STOP"))),
+                ("Fire", 370, (Action)(() => SendCommand("FIRE"))),
             };
 
-            foreach (var (label, handler) in buttons)
+            foreach (var (label, xPos, handler) in buttons)
             {
                 var btn = new Button
                 {
                     Text = label,
-                    Width = 80,
-                    Height = 40,
-                    BackColor = Color.FromArgb(0, 120, 215),
+                    Width = 110,
+                    Height = 45,
+                    Location = new Point(xPos, 8),
+                    BackColor = AccentColor,
                     ForeColor = Color.White,
-                    Font = new Font(this.Font, FontStyle.Bold)
+                    Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                    FlatStyle = FlatStyle.Flat,
+                    Cursor = Cursors.Hand
                 };
-                btn.Click += handler;
-                flowLayout.Controls.Add(btn);
+                btn.FlatAppearance.BorderSize = 0;
+                btn.Click += (s, e) => handler();
+                panel.Controls.Add(btn);
             }
 
-            return new[] { flowLayout };
+            return panel;
+        }
+
+        private Button CreateStyledButton(string text, int x, int y, int width)
+        {
+            return new Button
+            {
+                Text = text,
+                Width = width,
+                Height = 30,
+                Location = new Point(x, y),
+                BackColor = AccentColor,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
         }
 
         private void LoadROMs()
@@ -561,6 +665,7 @@ namespace CannonEmuFrontend
                 if (connectBtn != null)
                     connectBtn.Text = "Disconnect";
 
+                UpdateStatus($"Connected to {port}", $"Baud: {baudRate}");
                 Log($"Connected to {port} at {baudRate} baud");
 
                 _cancellationTokenSource = new CancellationTokenSource();
@@ -569,6 +674,7 @@ namespace CannonEmuFrontend
             catch (Exception ex)
             {
                 Log($"Connection failed: {ex.Message}");
+                UpdateStatus("Connection Failed", ex.Message);
             }
         }
 
@@ -585,6 +691,7 @@ namespace CannonEmuFrontend
                 if (connectBtn != null)
                     connectBtn.Text = "Connect";
 
+                UpdateStatus("Disconnected", "Ready");
                 Log("Disconnected");
             }
             catch (Exception ex)
@@ -645,6 +752,17 @@ namespace CannonEmuFrontend
             {
                 displayTextBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
             }
+        }
+
+        private void UpdateStatus(string status, string info)
+        {
+            var statusLabel = FindControlByName<Label>("StatusLabel");
+            var infoLabel = FindControlByName<Label>("InfoLabel");
+
+            if (statusLabel != null)
+                statusLabel.Text = status;
+            if (infoLabel != null)
+                infoLabel.Text = info;
         }
 
         private T? FindControlByName<T>(string name) where T : Control
