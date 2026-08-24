@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using System.IO.Ports;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace CannonEmuFrontend
 {
@@ -18,6 +20,14 @@ namespace CannonEmuFrontend
             InitializeComponent();
             SetupUI();
             LoadComPorts();
+        }
+
+        private void InitializeComponent()
+        {
+            this.SuspendLayout();
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.ResumeLayout(false);
         }
 
         private void SetupUI()
@@ -193,7 +203,7 @@ namespace CannonEmuFrontend
 
         private void LoadComPorts()
         {
-            var portCombo = this.Controls.OfType<ComboBox>().FirstOrDefault(c => c.Name == "PortCombo");
+            var portCombo = FindControlByName<ComboBox>("PortCombo");
             if (portCombo != null)
             {
                 var ports = SerialPort.GetPortNames();
@@ -217,9 +227,9 @@ namespace CannonEmuFrontend
         {
             try
             {
-                var portCombo = this.Controls.OfType<ComboBox>().FirstOrDefault(c => c.Name == "PortCombo");
-                var baudCombo = this.Controls.OfType<ComboBox>().FirstOrDefault(c => c.Name == "BaudCombo");
-                var connectBtn = this.Controls.OfType<Button>().FirstOrDefault(c => c.Name == "ConnectButton");
+                var portCombo = FindControlByName<ComboBox>("PortCombo");
+                var baudCombo = FindControlByName<ComboBox>("BaudCombo");
+                var connectBtn = FindControlByName<Button>("ConnectButton");
 
                 if (portCombo?.SelectedItem == null || baudCombo?.SelectedItem == null)
                     return;
@@ -260,7 +270,7 @@ namespace CannonEmuFrontend
                 _serialPort?.Dispose();
                 _isRunning = false;
 
-                var connectBtn = this.Controls.OfType<Button>().FirstOrDefault(c => c.Name == "ConnectButton");
+                var connectBtn = FindControlByName<Button>("ConnectButton");
                 if (connectBtn != null)
                     connectBtn.Text = "Connect";
 
@@ -319,11 +329,39 @@ namespace CannonEmuFrontend
 
         private void Log(string message)
         {
-            var displayTextBox = this.Controls.OfType<TextBox>().FirstOrDefault(c => c.Name == "DisplayTextBox");
+            var displayTextBox = FindControlByName<TextBox>("DisplayTextBox");
             if (displayTextBox != null)
             {
                 displayTextBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
             }
+        }
+
+        private T? FindControlByName<T>(string name) where T : Control
+        {
+            foreach (Control control in this.Controls)
+            {
+                if (control.Name == name && control is T typedControl)
+                    return typedControl;
+
+                T? found = FindControlByNameRecursive<T>(control, name);
+                if (found != null)
+                    return found;
+            }
+            return null;
+        }
+
+        private T? FindControlByNameRecursive<T>(Control parent, string name) where T : Control
+        {
+            foreach (Control control in parent.Controls)
+            {
+                if (control.Name == name && control is T typedControl)
+                    return typedControl;
+
+                T? found = FindControlByNameRecursive<T>(control, name);
+                if (found != null)
+                    return found;
+            }
+            return null;
         }
     }
 }
