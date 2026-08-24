@@ -6,6 +6,7 @@ using System.IO.Ports;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
+using System.IO;
 
 namespace CannonEmuFrontend
 {
@@ -14,12 +15,32 @@ namespace CannonEmuFrontend
         private SerialPort? _serialPort;
         private bool _isRunning = false;
         private CancellationTokenSource? _cancellationTokenSource;
+        private string _romsPath;
 
         public MainWindow()
         {
             InitializeComponent();
+            InitializeRomsDirectory();
             SetupUI();
             LoadComPorts();
+            LoadROMs();
+        }
+
+        private void InitializeRomsDirectory()
+        {
+            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string cannonEmuPath = Path.Combine(appDataPath, "CannonEmu");
+            _romsPath = Path.Combine(cannonEmuPath, "ROMs");
+
+            if (!Directory.Exists(cannonEmuPath))
+            {
+                Directory.CreateDirectory(cannonEmuPath);
+            }
+
+            if (!Directory.Exists(_romsPath))
+            {
+                Directory.CreateDirectory(_romsPath);
+            }
         }
 
         private void InitializeComponent()
@@ -42,6 +63,7 @@ namespace CannonEmuFrontend
             // Menu strip
             var menuStrip = new MenuStrip();
             var fileMenu = menuStrip.Items.Add("&File");
+            ((ToolStripMenuItem)fileMenu).DropDownItems.Add("Open ROMs Folder", null, (s, e) => OpenRomsFolder());
             ((ToolStripMenuItem)fileMenu).DropDownItems.Add("E&xit", null, (s, e) => this.Close());
             this.Controls.Add(menuStrip);
 
@@ -49,11 +71,12 @@ namespace CannonEmuFrontend
             var mainPanel = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                RowCount = 3,
+                RowCount = 4,
                 ColumnCount = 2,
                 Padding = new Padding(10),
                 BackColor = Color.FromArgb(30, 30, 30)
             };
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -71,6 +94,18 @@ namespace CannonEmuFrontend
             connPanel.Controls.AddRange(CreateConnectionControls());
             mainPanel.Controls.Add(connPanel, 0, 0);
             mainPanel.SetColumnSpan(connPanel, 2);
+
+            // ROM panel
+            var romPanel = new GroupBox
+            {
+                Text = "ROMs",
+                Padding = new Padding(10),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(45, 45, 45)
+            };
+            romPanel.Controls.AddRange(CreateROMControls());
+            mainPanel.Controls.Add(romPanel, 0, 1);
+            mainPanel.SetColumnSpan(romPanel, 2);
 
             // Display panel
             var displayPanel = new GroupBox
@@ -92,7 +127,7 @@ namespace CannonEmuFrontend
                 Font = new Font("Courier New", 10)
             };
             displayPanel.Controls.Add(displayTextBox);
-            mainPanel.Controls.Add(displayPanel, 0, 1);
+            mainPanel.Controls.Add(displayPanel, 0, 2);
             mainPanel.SetColumnSpan(displayPanel, 2);
 
             // Control panel
@@ -104,7 +139,7 @@ namespace CannonEmuFrontend
                 BackColor = Color.FromArgb(45, 45, 45)
             };
             ctrlPanel.Controls.AddRange(CreateControlButtons());
-            mainPanel.Controls.Add(ctrlPanel, 0, 2);
+            mainPanel.Controls.Add(ctrlPanel, 0, 3);
             mainPanel.SetColumnSpan(ctrlPanel, 2);
 
             this.Controls.Add(mainPanel);
@@ -166,6 +201,70 @@ namespace CannonEmuFrontend
             return controls.ToArray();
         }
 
+        private Control[] CreateROMControls()
+        {
+            var flowLayout = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                BackColor = Color.FromArgb(45, 45, 45),
+                FlowDirection = FlowDirection.TopDown
+            };
+
+            // ROMs List
+            var romListBox = new ListBox
+            {
+                Name = "ROMListBox",
+                Width = 750,
+                Height = 100,
+                BackColor = Color.FromArgb(20, 20, 20),
+                ForeColor = Color.White
+            };
+            flowLayout.Controls.Add(romListBox);
+
+            // Button panel
+            var buttonPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                BackColor = Color.FromArgb(45, 45, 45)
+            };
+
+            var loadBtn = new Button
+            {
+                Text = "Load Selected ROM",
+                Width = 120,
+                BackColor = Color.FromArgb(0, 120, 215),
+                ForeColor = Color.White
+            };
+            loadBtn.Click += (s, e) => LoadSelectedROM();
+            buttonPanel.Controls.Add(loadBtn);
+
+            var refreshRomsBtn = new Button
+            {
+                Text = "Refresh ROMs",
+                Width = 100,
+                BackColor = Color.FromArgb(100, 100, 100),
+                ForeColor = Color.White
+            };
+            refreshRomsBtn.Click += (s, e) => LoadROMs();
+            buttonPanel.Controls.Add(refreshRomsBtn);
+
+            var openFolderBtn = new Button
+            {
+                Text = "Open Folder",
+                Width = 100,
+                BackColor = Color.FromArgb(100, 100, 100),
+                ForeColor = Color.White
+            };
+            openFolderBtn.Click += (s, e) => OpenRomsFolder();
+            buttonPanel.Controls.Add(openFolderBtn);
+
+            flowLayout.Controls.Add(buttonPanel);
+
+            return new[] { flowLayout };
+        }
+
         private Control[] CreateControlButtons()
         {
             var flowLayout = new FlowLayoutPanel
@@ -199,6 +298,93 @@ namespace CannonEmuFrontend
             }
 
             return new[] { flowLayout };
+        }
+
+        private void LoadROMs()
+        {
+            try
+            {
+                var romListBox = FindControlByName<ListBox>("ROMListBox");
+                if (romListBox == null) return;
+
+                romListBox.Items.Clear();
+
+                if (!Directory.Exists(_romsPath))
+                {
+                    Log("ROMs directory not found");
+                    return;
+                }
+
+                var romFiles = Directory.GetFiles(_romsPath, "*.*", SearchOption.TopDirectoryOnly)
+                    .Where(f => IsValidROMExtension(f))
+                    .Select(f => Path.GetFileName(f))
+                    .ToArray();
+
+                if (romFiles.Length == 0)
+                {
+                    Log($"No ROMs found in {_romsPath}");
+                }
+                else
+                {
+                    foreach (var rom in romFiles)
+                    {
+                        romListBox.Items.Add(rom);
+                    }
+                    Log($"Loaded {romFiles.Length} ROM(s)");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"Error loading ROMs: {ex.Message}");
+            }
+        }
+
+        private bool IsValidROMExtension(string filePath)
+        {
+            string[] validExtensions = { ".bin", ".rom", ".gb", ".gba", ".nes", ".sfc", ".z64" };
+            string extension = Path.GetExtension(filePath).ToLower();
+            return validExtensions.Contains(extension);
+        }
+
+        private void LoadSelectedROM()
+        {
+            var romListBox = FindControlByName<ListBox>("ROMListBox");
+            if (romListBox?.SelectedItem == null)
+            {
+                Log("No ROM selected");
+                return;
+            }
+
+            string selectedROM = romListBox.SelectedItem.ToString()!;
+            string romPath = Path.Combine(_romsPath, selectedROM);
+
+            try
+            {
+                if (!File.Exists(romPath))
+                {
+                    Log($"ROM file not found: {selectedROM}");
+                    return;
+                }
+
+                SendCommand($"LOAD_ROM:{romPath}");
+                Log($"Loaded ROM: {selectedROM}");
+            }
+            catch (Exception ex)
+            {
+                Log($"Error loading ROM: {ex.Message}");
+            }
+        }
+
+        private void OpenRomsFolder()
+        {
+            try
+            {
+                System.Diagnostics.Process.Start("explorer.exe", _romsPath);
+            }
+            catch (Exception ex)
+            {
+                Log($"Error opening folder: {ex.Message}");
+            }
         }
 
         private void LoadComPorts()
