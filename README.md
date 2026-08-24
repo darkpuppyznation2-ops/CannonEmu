@@ -1,6 +1,6 @@
-# Cannon Emulator Frontend
+# Cannon Emu
 
-A C# WinForms-based emulation frontend for the Cannon Emulator project.
+DISCLAIMER: CannonEmu is not related to Retroarch in anyway except for the emulation frontend idea!
 
 ## Features
 
